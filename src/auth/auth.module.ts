@@ -1,21 +1,24 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { JwtStrategy } from './jwt.strategy';
+import { AuthController } from './auth.controller';
 import { UserModule } from '../user/user.module';
+import { JwtModule } from '@nestjs/jwt';
+import { User } from 'src/user/user-model/user.model';
+import { Token } from './utils/token/token.model';
+import { SequelizeModule } from '@nestjs/sequelize';
+import { TokenService } from './token.service';
 
 @Module({
   imports: [
-    ConfigModule, // Додаємо ConfigModule
-    PassportModule,
+    SequelizeModule.forFeature([User, Token]),
     JwtModule.register({
-      secret: process.env.JWT_SECRET, // або configService.get('JWT_SECRET')
+      secret: process.env.JWT_SECRET || 'your-secret-key', // Add a default secret for development/testing
       signOptions: { expiresIn: '60m' },
     }),
-    UserModule,
+    forwardRef(() => UserModule), // Use forwardRef to handle circular dependencies
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, TokenService],
+  controllers: [AuthController],
+  exports: [AuthService, TokenService], // Make AuthService available for other modules
 })
 export class AuthModule { }

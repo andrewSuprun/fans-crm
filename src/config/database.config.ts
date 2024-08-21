@@ -10,3 +10,4 @@ export const sequelizeConfig: SequelizeModuleOptions = {
   autoLoadModels: true,
   synchronize: true,
 };
+
