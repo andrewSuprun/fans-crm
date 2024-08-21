@@ -1,10 +1,11 @@
-// src/modules/user/models/user.model.ts
-
 import { Table, Column, Model, DataType } from 'sequelize-typescript';
 
 @Table
 export class User extends Model {
-  @Column
+  @Column({
+    type: DataType.STRING,
+    allowNull: false,
+  })
   name: string;
 
   @Column({
@@ -20,6 +21,8 @@ export class User extends Model {
   })
   password: string;
 
-  @Column
+  @Column({
+    type: DataType.STRING,
+  })
   phone: string;
 }

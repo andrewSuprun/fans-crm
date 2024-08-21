@@ -1,5 +1,3 @@
-// src/modules/auth-module/guards/auth.guard.ts
-
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { TokenService } from '../token.service';
@@ -12,18 +10,31 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const token = request.headers.authorization?.split(' ')[1]; // Extract token from Authorization header
+    try {
+      const request = context.switchToHttp().getRequest();
+      const authorizationHeader = request.headers.authorization;
 
-    if (!token) return false;
+      if (!authorizationHeader) return false;
 
-    const isValid = await this.tokenService.isValidToken('ACCESS', token);
-    if (!isValid) return false;
+      const [scheme, token] = authorizationHeader.split(' ');
 
-    const user = await this.tokenService.decodeToken('ACCESS', token);
-    if (!user) return false;
+      if (scheme !== 'Bearer' || !token) return false;
 
-    request.user = user;
-    return true;
+      // Determine token type from route metadata or logic
+      const tokenType =
+        this.reflector.get<string>('tokenType', context.getHandler()) ||
+        ('ACCESS' as any);
+      const isValid = await this.tokenService.isValidToken(tokenType, token);
+      if (!isValid) return false;
+
+      const user = await this.tokenService.decodeToken(tokenType, token);
+      if (!user) return false;
+
+      request.user = user;
+      return true;
+    } catch (error) {
+      console.log(error, 'error on canActivate');
+      return false;
+    }
   }
 }

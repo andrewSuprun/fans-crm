@@ -13,29 +13,27 @@ export class TokenService {
   ) {}
 
   async generateToken(type: 'ACCESS' | 'REFRESH', data: any) {
-    const secret = process.env[`${type}_TOKEN_SECRET`];
-    const expiresIn = process.env[`${type}_TOKEN_LIFE`];
+    try {
+      const secret = process.env[`${type}_TOKEN_SECRET`];
+      const expiresIn = process.env[`${type}_TOKEN_LIFE`];
+      const expiresInValue = Number(expiresIn) ? Number(expiresIn) : expiresIn;
+      const token = this.jwtService.sign(data, {
+        algorithm: 'HS256',
+        secret,
+        expiresIn: expiresInValue,
+      });
 
-    const token = this.jwtService.sign(data, {
-      secret,
-      expiresIn,
-    });
-
-    const expiresAt = new Date(Date.now() + parseInt(expiresIn) * 1000);
-
-    await this.tokenModel.create({
-      token,
-      type,
-      expiresAt,
-    });
-
-    return token;
+      return token;
+    } catch (error) {
+      console.log('error generating token', error);
+    }
   }
 
   async isValidToken(type: 'ACCESS' | 'REFRESH', token: string) {
     try {
+      const secret = process.env[`${type}_TOKEN_SECRET`];
       const decoded = this.jwtService.verify(token, {
-        secret: process.env[`${type}_TOKEN_SECRET`],
+        secret,
       });
       return !!decoded;
     } catch (error) {
@@ -44,16 +42,17 @@ export class TokenService {
     }
   }
 
-  async isTokenPresent(type: 'ACCESS' | 'REFRESH', token: string) {
+  async isTokenPresent(userId: string) {
     const record = await this.tokenModel.findOne({
-      where: { token, type },
+      where: { userId },
     });
-    return !!record;
+    return record;
   }
 
   async decodeToken(type: 'ACCESS' | 'REFRESH', token: string) {
     try {
       const decoded = this.jwtService.verify(token, {
+        algorithms: ['HS256'],
         secret: process.env[`${type}_TOKEN_SECRET`],
       });
       return decoded;
@@ -61,5 +60,11 @@ export class TokenService {
       console.log('Token decoding failed:', error);
       return null;
     }
+  }
+  async invalidateTokens(userId: number) {
+    // Remove all tokens for the user
+    await this.tokenModel.destroy({
+      where: { userId },
+    });
   }
 }

@@ -23,9 +23,7 @@ export class UserService {
     phone: string;
     name: string;
   }): Promise<User> {
-    console.log(password, 'password');
     const hashedPassword = await this.hashPassword(password);
-    console.log(hashedPassword, 'hashedPassword');
     return this.userModel.create({
       email,
       password: hashedPassword,

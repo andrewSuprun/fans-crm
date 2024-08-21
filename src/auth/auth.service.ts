@@ -1,17 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
+import { TokenService } from './token.service'; // Import TokenService
 import { Token } from './utils/token/token.model';
 import { InjectModel } from '@nestjs/sequelize';
-// Import Token model
 
 @Injectable()
 export class AuthService {
   constructor(
     private userService: UserService,
-    private jwtService: JwtService,
+    private tokenService: TokenService, // Inject TokenService
     @InjectModel(Token)
-    private tokenModel: typeof Token, // Inject Token model
+    private tokenModel: typeof Token,
   ) { }
 
   async validateUser(email: string, plainPassword: string): Promise<any> {
@@ -27,25 +26,63 @@ export class AuthService {
   }
 
   async login(user: any) {
-    try {
-      const payload = { email: user.email, sub: user.id };
-      const accessToken = this.jwtService.sign(payload);
-      const expiresIn = +process.env.JWT_ACCESS_TOKEN_EXPIRES_IN; // E.g., '3600' for 1 hour
-      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+    const payload = { email: user.email, sub: user.id };
 
-      // Save the token to the database
+    const existingToken = await this.tokenService.isTokenPresent(user.id);
+    console.log(existingToken, 'existingToken');
+
+    if (!!existingToken) {
+      const isTokenExpired = existingToken.expiresAt < new Date();
+
+      if (isTokenExpired) {
+        await existingToken.destroy();
+        return {
+          message: 'Token expired',
+        };
+      } else {
+        // Update existing token with refresh token logic
+        const refreshToken = await this.tokenService.generateToken(
+          'ACCESS',
+          payload,
+        );
+        await existingToken.destroy();
+        await this.tokenModel.create({
+          token: refreshToken,
+          type: 'ACCESS',
+          userId: user.id,
+          expiresAt: new Date(
+            Date.now() + parseInt(process.env.REFRESH_TOKEN_LIFE) * 1000,
+          ),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        return {
+          refresh_token: refreshToken,
+        };
+      }
+    } else {
+      // Create a new access token
+      const accessToken = await this.tokenService.generateToken(
+        'ACCESS',
+        payload,
+      );
+      await this.tokenModel.destroy({
+        where: { userId: user.id },
+      });
       await this.tokenModel.create({
         token: accessToken,
         type: 'ACCESS',
         userId: user.id,
-        expiresAt: expiresAt,
+        expiresAt: new Date(
+          Date.now() + parseInt(process.env.ACCESS_TOKEN_LIFE) * 1000,
+        ),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
 
       return {
         access_token: accessToken,
       };
-    } catch (error) {
-      console.log(error, 'error at login');
-     }
+    }
   }
 }

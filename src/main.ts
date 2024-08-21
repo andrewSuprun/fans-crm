@@ -29,7 +29,7 @@ const sequelize = new Sequelize({
 
 // Sync the models with the database
 sequelize
-  .sync({ alter: true })
+  .sync()
   .then(() => {
     console.log('Database synchronized');
   })
